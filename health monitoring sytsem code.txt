@@ -1,0 +1,69 @@
+/***** Adafruit IO Credentials *****/
+#define IO_USERNAME  "your_username"
+#define IO_KEY       "your_aio_key"
+
+/***** WiFi Credentials *****/
+#define WIFI_SSID     "your_wifi_name"
+#define WIFI_PASS     "your_wifi_password"
+
+#include "AdafruitIO_WiFi.h"
+AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, WIFI_SSID, WIFI_PASS);
+
+/***** I/O Feeds *****/
+AdafruitIO_Feed *temperature = io.feed("temperature");
+AdafruitIO_Feed *heartbeat = io.feed("heartbeat");
+
+/***** LCD Setup *****/
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+/***** Pins *****/
+const int tempPin = A0;       // LM35
+const int pulsePin = D1;      // Heartbeat
+
+void setup() {
+  Serial.begin(115200);
+  lcd.begin();
+  lcd.backlight();
+
+  io.connect();  // Connect to Adafruit IO
+
+  while (io.status() < AIO_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("Connected to Adafruit IO!");
+  lcd.setCursor(0, 0);
+  lcd.print("Health Monitor");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  io.run();  // Keep Adafruit IO alive
+
+  // Read temperature (in °C)
+  int rawValue = analogRead(tempPin);
+  float voltage = rawValue * (3.3 / 1024.0);
+  float tempC = voltage * 100;
+
+  // Read heartbeat (analog)
+  int heartRate = analogRead(pulsePin);  // just a raw analog value
+
+  // Display on LCD
+  lcd.setCursor(0, 0);
+  lcd.print("Temp: ");
+  lcd.print(tempC);
+  lcd.print("C");
+
+  lcd.setCursor(0, 1);
+  lcd.print("Pulse: ");
+  lcd.print(heartRate);
+
+  // Send to Adafruit IO
+  temperature->save(tempC);
+  heartbeat->save(heartRate);
+
+  delay(5000);  // Update every 5 seconds
+}
